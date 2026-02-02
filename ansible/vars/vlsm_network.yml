@@ -1,0 +1,67 @@
+---
+# Configuration GNS3
+gns3_url: "http://127.0.0.1:3080/v2"
+project_name: "lab-vlsm"
+
+# Configuration routeur
+routeur:
+  name: "Routeur1"
+  wan_interface: "FastEthernet0/0"
+  lan_interface: "FastEthernet0/1"
+
+# Dns
+dns:
+  primary: "8.8.8.8"
+  secondary: "8.8.4.4"
+
+# VLANs
+vlans:
+  - id: 10
+    name: "Administration"
+    network: "192.168.100.0"
+    cidr: "/26"
+    mask: "255.255.255.192"
+    gateway: "192.168.100.1"
+    broadcast: "192.168.100.63"
+    dhcp_start: "192.168.100.2"
+    dhcp_end: "192.168.100.62"
+
+  - id: 20
+    name: "HR"
+    network: "192.168.100.64"
+    cidr: "/27"
+    mask: "255.255.255.224"
+    gateway: "192.168.100.65"
+    broadcast: "192.168.100.95"
+    dhcp_start: "192.168.100.66"
+    dhcp_end: "192.168.100.94"
+
+  - id: 30
+    name: "Ventes"
+    network: "192.168.100.96"
+    cidr: "/27"
+    mask: "255.255.255.224"
+    gateway: "192.168.100.97"
+    broadcast: "192.168.100.127"
+    dhcp_start: "192.168.100.98"
+    dhcp_end: "192.168.100.126"
+
+  - id: 40
+    name: "IT"
+    network: "192.168.100.128"
+    cidr: "/28"
+    mask: "255.255.255.240"
+    gateway: "192.168.100.129"
+    broadcast: "192.168.100.143"
+    dhcp_start: "192.168.100.130"
+    dhcp_end: "192.168.100.142"
+
+  - id: 50
+    name: "Invités"
+    network: "192.168.100.144"
+    cidr: "/29"
+    mask: "255.255.255.248"
+    gateway: "192.168.100.145"
+    broadcast: "192.168.100.151"
+    dhcp_start: "192.168.100.146"
+    dhcp_end: "192.168.100.150"
