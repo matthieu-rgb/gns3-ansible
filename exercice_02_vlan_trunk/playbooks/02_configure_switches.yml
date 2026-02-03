@@ -1,0 +1,232 @@
+---
+- name: "Configurer les switches"
+  hosts: localhost
+  connection: local
+  gather_facts: no
+
+  vars_files:
+    - ../vars/network.yml
+
+  tasks:
+    - name: "Récupérer les projets"
+      uri:
+        url: "{{ gns3_url }}/projects"
+        method: GET
+      register: projets
+
+    - name: "Chercher notre projet"
+      set_fact:
+        project_id: "{{ (projets.json | selectattr('name', 'equalto', project_name) | first).project_id }}"
+
+    - name: "Récupérer tous les nodes"
+      uri:
+        url: "{{ gns3_url }}/projects/{{ project_id }}/nodes"
+        method: GET
+      register: all_nodes
+
+    - name: "Extraire les infos des switches"
+      set_fact:
+        switch1_console: "{{ (all_nodes.json | selectattr('name', 'equalto', 'Switch1') | first).console }}"
+        switch2_console: "{{ (all_nodes.json | selectattr('name', 'equalto', 'Switch2') | first).console }}"
+        switch3_console: "{{ (all_nodes.json | selectattr('name', 'equalto', 'Switch3') | first).console }}"
+
+    - name: "Afficher les ports console"
+      debug:
+        msg:
+          - "Switch1 : 192.168.138.198:{{ switch1_console }}"
+          - "Switch2 : 192.168.138.198:{{ switch2_console }}"
+          - "Switch3 : 192.168.138.198:{{ switch3_console }}"
+
+    - name: "Configurer Switch1"
+      ansible.builtin.shell: |
+        expect << 'EOF'
+        set timeout 30
+        spawn telnet 192.168.138.198 {{ switch1_console }}
+        sleep 2
+        send "\r"
+        sleep 1
+        expect "#"
+        send "configure terminal\r"
+        expect "#"
+        {% for vlan in vlans %}
+        send "vlan {{ vlan.id }}\r"
+        expect "#"
+        send "name {{ vlan.name }}\r"
+        expect "#"
+        {% endfor %}
+        send "exit\r"
+        expect "#"
+        send "interface Ethernet0/0\r"
+        expect "#"
+        send "switchport trunk encapsulation dot1q\r"
+        expect "#"
+        send "switchport mode trunk\r"
+        expect "#"
+        send "no shutdown\r"
+        expect "#"
+        send "exit\r"
+        expect "#"
+        send "interface Ethernet0/1\r"
+        expect "#"
+        send "switchport mode access\r"
+        expect "#"
+        send "switchport access vlan 10\r"
+        expect "#"
+        send "no shutdown\r"
+        expect "#"
+        send "exit\r"
+        expect "#"
+        send "interface Ethernet0/2\r"
+        expect "#"
+        send "switchport mode access\r"
+        expect "#"
+        send "switchport access vlan 20\r"
+        expect "#"
+        send "no shutdown\r"
+        expect "#"
+        send "exit\r"
+        expect "#"
+        send "end\r"
+        expect "#"
+        send "write memory\r"
+        sleep 2
+        send "\r"
+        expect "#"
+        send "exit\r"
+        EOF
+      args:
+        executable: /bin/bash
+
+    - name: "Configurer Switch2"
+      ansible.builtin.shell: |
+        expect << 'EOF'
+        set timeout 30
+        spawn telnet 192.168.138.198 {{ switch2_console }}
+        sleep 2
+        send "\r"
+        sleep 1
+        expect "#"
+        send "configure terminal\r"
+        expect "#"
+        {% for vlan in vlans %}
+        send "vlan {{ vlan.id }}\r"
+        expect "#"
+        send "name {{ vlan.name }}\r"
+        expect "#"
+        {% endfor %}
+        send "exit\r"
+        expect "#"
+        send "interface Ethernet0/0\r"
+        expect "#"
+        send "switchport trunk encapsulation dot1q\r"
+        expect "#"
+        send "switchport mode trunk\r"
+        expect "#"
+        send "no shutdown\r"
+        expect "#"
+        send "exit\r"
+        expect "#"
+        send "interface Ethernet0/3\r"
+        expect "#"
+        send "switchport trunk encapsulation dot1q\r"
+        expect "#"
+        send "switchport mode trunk\r"
+        expect "#"
+        send "no shutdown\r"
+        expect "#"
+        send "exit\r"
+        expect "#"
+        send "interface Ethernet0/1\r"
+        expect "#"
+        send "switchport mode access\r"
+        expect "#"
+        send "switchport access vlan 30\r"
+        expect "#"
+        send "no shutdown\r"
+        expect "#"
+        send "exit\r"
+        expect "#"
+        send "interface Ethernet0/2\r"
+        expect "#"
+        send "switchport mode access\r"
+        expect "#"
+        send "switchport access vlan 10\r"
+        expect "#"
+        send "no shutdown\r"
+        expect "#"
+        send "exit\r"
+        expect "#"
+        send "end\r"
+        expect "#"
+        send "write memory\r"
+        sleep 2
+        send "\r"
+        expect "#"
+        send "exit\r"
+        EOF
+      args:
+        executable: /bin/bash
+
+    - name: "Configurer Switch3"
+      ansible.builtin.shell: |
+        expect << 'EOF'
+        set timeout 30
+        spawn telnet 192.168.138.198 {{ switch3_console }}
+        sleep 2
+        send "\r"
+        sleep 1
+        expect "#"
+        send "configure terminal\r"
+        expect "#"
+        {% for vlan in vlans %}
+        send "vlan {{ vlan.id }}\r"
+        expect "#"
+        send "name {{ vlan.name }}\r"
+        expect "#"
+        {% endfor %}
+        send "exit\r"
+        expect "#"
+        send "interface Ethernet0/3\r"
+        expect "#"
+        send "switchport trunk encapsulation dot1q\r"
+        expect "#"
+        send "switchport mode trunk\r"
+        expect "#"
+        send "no shutdown\r"
+        expect "#"
+        send "exit\r"
+        expect "#"
+        send "interface Ethernet0/1\r"
+        expect "#"
+        send "switchport mode access\r"
+        expect "#"
+        send "switchport access vlan 40\r"
+        expect "#"
+        send "no shutdown\r"
+        expect "#"
+        send "exit\r"
+        expect "#"
+        send "interface Ethernet0/2\r"
+        expect "#"
+        send "switchport mode access\r"
+        expect "#"
+        send "switchport access vlan 50\r"
+        expect "#"
+        send "no shutdown\r"
+        expect "#"
+        send "exit\r"
+        expect "#"
+        send "end\r"
+        expect "#"
+        send "write memory\r"
+        sleep 2
+        send "\r"
+        expect "#"
+        send "exit\r"
+        EOF
+      args:
+        executable: /bin/bash
+
+    - name: "Configuration terminée"
+      debug:
+        msg: "✅ Les 3 switches sont configurés avec VLANs et trunks !"

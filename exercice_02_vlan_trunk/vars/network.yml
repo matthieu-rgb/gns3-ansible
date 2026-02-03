@@ -1,0 +1,88 @@
+gns3_url: "http://192.168.138.198:80/v2"
+project_name: "lab-vlan-trunk"
+
+# VLANs
+vlans:
+  - id: 10
+    name: "Administration"
+  - id: 20
+    name: "HR"
+  - id: 30
+    name: "Ventes"
+  - id: 40
+    name: "IT"
+  - id: 50
+    name: "Invites"
+
+# Switches
+switches:
+  - name: "Switch1"
+    x: -200
+    y: 0
+  - name: "Switch2"
+    x: 0
+    y: 0
+  - name: "Switch3"
+    x: 200
+    y: 0
+
+# === PCs et leur affectation ===
+pcs:
+  - name: "PC_Admin"
+    switch: "Switch1"
+    adapter: 0
+    port: 1
+    vlan: 10
+    x: -300
+    y: -150
+  - name: "PC_HR"
+    switch: "Switch1"
+    adapter: 0
+    port: 2
+    vlan: 20
+    x: -300
+    y: 150
+  - name: "PC_Ventes"
+    switch: "Switch2"
+    adapter: 0
+    port: 1
+    vlan: 30
+    x: 0
+    y: -150
+  - name: "PC_Admin2"
+    switch: "Switch2"
+    adapter: 0
+    port: 2
+    vlan: 10
+    x: 0
+    y: 150
+  - name: "PC_IT"
+    switch: "Switch3"
+    adapter: 0
+    port: 1
+    vlan: 40
+    x: 300
+    y: -150
+  - name: "PC_Invites"
+    switch: "Switch3"
+    adapter: 0
+    port: 2
+    vlan: 50
+    x: 300
+    y: 150
+
+# === Liens trunk entre switches ===
+# Port Ethernet0/0 utilisé pour les trunks
+trunks:
+  - switch_a: "Switch1"
+    adapter_a: 0
+    port_a: 0 # Ethernet0/0
+    switch_b: "Switch2"
+    adapter_b: 0
+    port_b: 3 # Ethernet0/3
+  - switch_a: "Switch2"
+    adapter_a: 0
+    port_a: 0 # Ethernet0/0
+    switch_b: "Switch3"
+    adapter_b: 0
+    port_b: 3 # Ethernet0/3
