@@ -1,0 +1,95 @@
+---
+# ============================================
+# TOPOLOGIE TRIANGLE POUR STP
+# ============================================
+#
+#                    Switch1
+#                   Eth0/0  Eth0/2
+#                    /         \
+#       trunk       /           \       trunk
+#                  /             \
+#            Eth0/0               Eth0/0
+#            Switch2 ─────────── Switch3
+#                   Eth0/2   Eth0/2
+#                      trunk
+#
+#               │                   │
+#            Eth0/1              Eth0/1
+#               │                   │
+#              PC2                 PC3
+#           (VLAN10)            (VLAN10)
+#
+#                      │
+#                   Eth0/1
+#                      │
+#                     PC1
+#                  (VLAN10)
+#
+# ============================================
+
+# === Configuration GNS3 ===
+gns3_url: "http://192.168.138.198:80/v2"
+project_name: "lab-stp"
+
+# === VLAN unique pour cet exercice ===
+vlans:
+  - id: 10
+    name: "Production"
+
+# === Switches en triangle ===
+switches:
+  - name: "Switch1"
+    x: 0
+    y: -100
+  - name: "Switch2"
+    x: -150
+    y: 100
+  - name: "Switch3"
+    x: 150
+    y: 100
+
+# === PCs (1 par switch) ===
+pcs:
+  - name: "PC1"
+    switch: "Switch1" # Connecté à Switch1
+    adapter: 0
+    port: 1 # Ethernet0/1
+    vlan: 10
+    x: 0
+    y: -250
+  - name: "PC2"
+    switch: "Switch2" # Connecté à Switch2
+    adapter: 0
+    port: 1 # Ethernet0/1
+    vlan: 10
+    x: -250
+    y: 100
+  - name: "PC3"
+    switch: "Switch3" # Connecté à Switch3
+    adapter: 0
+    port: 1 # Ethernet0/1
+    vlan: 10
+    x: 250
+    y: 100
+
+# === Liens trunk (TRIANGLE) ===
+# 3 liens pour former le triangle = redondance = STP nécessaire
+trunks:
+  - switch_a: "Switch1"
+    adapter_a: 0
+    port_a: 0 # Eth0/0 → Switch2
+    switch_b: "Switch2"
+    adapter_b: 0
+    port_b: 0 # Eth0/0
+  - switch_a: "Switch1"
+    adapter_a: 0
+    port_a: 2 # Eth0/2 → Switch3
+    switch_b: "Switch3"
+    adapter_b: 0
+    port_b: 0 # Eth0/0
+  - switch_a: "Switch2"
+    adapter_a: 0
+    port_a: 2 # Eth0/2 → Switch3
+    switch_b: "Switch3"
+    adapter_b: 0
+    port_b: 2 # Eth0/2

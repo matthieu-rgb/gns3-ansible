@@ -1,0 +1,162 @@
+---
+# ============================================
+# PLAYBOOK : Analyse du Spanning Tree Protocol
+# ============================================
+# Ce playbook analyse :
+# - Quel switch est le Root Bridge
+# - Les ports Root, Designated et Blocked
+# - L'état STP sur chaque switch
+# ============================================
+
+- name: "Analyser le Spanning Tree Protocol"
+  hosts: localhost
+  connection: local
+  gather_facts: no
+
+  vars_files:
+    - ../vars/network.yml
+
+  tasks:
+    # ============================================
+    # ÉTAPE 1 : Récupérer les infos du projet
+    # ============================================
+    - name: "Récupérer les projets"
+      uri:
+        url: "{{ gns3_url }}/projects"
+        method: GET
+      register: projets
+
+    - name: "Chercher notre projet"
+      set_fact:
+        project_id: "{{ (projets.json | selectattr('name', 'equalto', project_name) | first).project_id }}"
+
+    - name: "Récupérer tous les nodes"
+      uri:
+        url: "{{ gns3_url }}/projects/{{ project_id }}/nodes"
+        method: GET
+      register: all_nodes
+
+    # ============================================
+    # ÉTAPE 2 : Récupérer les ports console
+    # ============================================
+    - name: "Extraire les ports console des switches"
+      set_fact:
+        switch1_console: "{{ (all_nodes.json | selectattr('name', 'equalto', 'Switch1') | first).console }}"
+        switch2_console: "{{ (all_nodes.json | selectattr('name', 'equalto', 'Switch2') | first).console }}"
+        switch3_console: "{{ (all_nodes.json | selectattr('name', 'equalto', 'Switch3') | first).console }}"
+
+    # ============================================
+    # ÉTAPE 3 : Analyser STP sur Switch1
+    # ============================================
+    - name: "Analyser STP sur Switch1"
+      ansible.builtin.shell: |
+        expect << 'EOF'
+        set timeout 30
+        spawn telnet 192.168.138.198 {{ switch1_console }}
+        sleep 2
+        send "\r"
+        sleep 1
+        expect "#"
+        send "show spanning-tree vlan 10\r"
+        expect "#"
+        send "exit\r"
+        expect eof
+        EOF
+      args:
+        executable: /bin/bash
+      register: stp_switch1
+
+    - name: "Résultat STP Switch1"
+      debug:
+        msg: "{{ stp_switch1.stdout_lines }}"
+
+    # ============================================
+    # ÉTAPE 4 : Analyser STP sur Switch2
+    # ============================================
+    - name: "Analyser STP sur Switch2"
+      ansible.builtin.shell: |
+        expect << 'EOF'
+        set timeout 30
+        spawn telnet 192.168.138.198 {{ switch2_console }}
+        sleep 2
+        send "\r"
+        sleep 1
+        expect "#"
+        send "show spanning-tree vlan 10\r"
+        expect "#"
+        send "exit\r"
+        expect eof
+        EOF
+      args:
+        executable: /bin/bash
+      register: stp_switch2
+
+    - name: "Résultat STP Switch2"
+      debug:
+        msg: "{{ stp_switch2.stdout_lines }}"
+
+    # ============================================
+    # ÉTAPE 5 : Analyser STP sur Switch3
+    # ============================================
+    - name: "Analyser STP sur Switch3"
+      ansible.builtin.shell: |
+        expect << 'EOF'
+        set timeout 30
+        spawn telnet 192.168.138.198 {{ switch3_console }}
+        sleep 2
+        send "\r"
+        sleep 1
+        expect "#"
+        send "show spanning-tree vlan 10\r"
+        expect "#"
+        send "exit\r"
+        expect eof
+        EOF
+      args:
+        executable: /bin/bash
+      register: stp_switch3
+
+    - name: "Résultat STP Switch3"
+      debug:
+        msg: "{{ stp_switch3.stdout_lines }}"
+
+    # ============================================
+    # RÉSUMÉ
+    # ============================================
+    - name: "Guide d'interprétation"
+      debug:
+        msg: |
+          ============================================
+          📚 GUIDE D'INTERPRÉTATION STP
+          ============================================
+
+          🔍 Dans les résultats, cherchez :
+
+          1️⃣  ROOT BRIDGE (Pont Racine)
+             → "This bridge is the root"
+             → Le switch avec la PLUS BASSE priorité
+             → Priorité par défaut : 32768 + VLAN ID
+
+          2️⃣  RÔLES DES PORTS
+             → Root (Root)     : Meilleur chemin vers le Root Bridge
+             → Desg (Designated) : Port qui forward le trafic
+             → BLK  (Blocked)  : Port bloqué pour éviter la boucle
+             → Altn (Alternate) : Port de backup (bloqué)
+
+          3️⃣  ÉTATS DES PORTS
+             → FWD (Forwarding) : Actif, transmet le trafic
+             → BLK (Blocking)   : Bloqué, ne transmet pas
+             → LRN (Learning)   : Apprend les MAC, ne transmet pas encore
+             → LIS (Listening)  : Écoute les BPDU
+
+          ============================================
+          🔧 COMMANDES MANUELLES UTILES
+          ============================================
+
+          telnet 192.168.138.198 {{ switch1_console }}
+
+          show spanning-tree vlan 10
+          show spanning-tree summary
+          show spanning-tree interface Eth0/0
+
+          ============================================
