@@ -1,0 +1,140 @@
+---
+- name: "Configurer le switch IOU L2"
+  hosts: localhost
+  connection: "local"
+  gather_facts: no
+
+  vars_files:
+    - ../vars/vlsm_network.yml
+
+  tasks:
+    - name: "Récupérer les projets existants"
+      uri:
+        url: "{{ gns3_url }}/projects"
+        method: GET
+      register: projets
+
+    - name: "Chercher notre projet"
+      set_fact:
+        projet_existant: "{{ projets.json | selectattr('name', 'equalto', project_name) | first }}"
+
+    - name: "Extraire le project_id"
+      set_fact:
+        project_id: "{{ projet_existant.project_id }}"
+
+    - name: "Recupérer tous les nodes"
+      uri:
+        url: "{{ gns3_url }}/projects/{{ project_id }}/nodes"
+        method: GET
+      register: all_nodes
+
+    - name: "Extraire le switch_id"
+      set_fact:
+        switch_id: "{{ (all_nodes.json | selectattr('name', 'equalto', 'Switch1') | first).node_id }}"
+
+    - name: "Récupérer les infos du switch"
+      uri:
+        url: "{{ gns3_url }}/projects/{{ project_id }}/nodes/{{ switch_id }}"
+        method: GET
+      register: switch_info
+
+    - name: "Afficher le port console"
+      debug:
+        msg: "Console Telnet: 192.168.138.198:{{ switch_info.json.console }}"
+
+    - name: "Configurer le switch complet"
+      ansible.builtin.shell: |
+        expect << 'EOF'
+        set timeout 60
+        spawn telnet 192.168.138.198 {{ switch_info.json.console }}
+
+        expect ">" { send "enable\r" }
+        expect "#" { send "configure terminal\r" }
+        expect "#"
+
+        {% for vlan in vlans %}
+        send "vlan {{ vlan.id }}\r"
+        expect "#"
+        send "name {{ vlan.name }}\r"
+        expect "#"
+        {% endfor %}
+
+        send "exit\r"
+        expect "#"
+
+        send "interface Ethernet0/0\r"
+        expect "#"
+        send "switchport trunk encapsulation dot1q\r"
+        expect "#"
+        send "switchport mode trunk\r"
+        expect "#"
+        send "no shutdown\r"
+        expect "#"
+        send "exit\r"
+        expect "#"
+
+        send "interface Ethernet0/1\r"
+        expect "#"
+        send "switchport mode access\r"
+        expect "#"
+        send "switchport access vlan 10\r"
+        expect "#"
+        send "no shutdown\r"
+        expect "#"
+        send "exit\r"
+        expect "#"
+
+        send "interface Ethernet0/2\r"
+        expect "#"
+        send "switchport mode access\r"
+        expect "#"
+        send "switchport access vlan 20\r"
+        expect "#"
+        send "no shutdown\r"
+        expect "#"
+        send "exit\r"
+        expect "#"
+
+        send "interface Ethernet0/3\r"
+        expect "#"
+        send "switchport mode access\r"
+        expect "#"
+        send "switchport access vlan 30\r"
+        expect "#"
+        send "no shutdown\r"
+        expect "#"
+        send "exit\r"
+        expect "#"
+
+        send "interface Ethernet1/0\r"
+        expect "#"
+        send "switchport mode access\r"
+        expect "#"
+        send "switchport access vlan 40\r"
+        expect "#"
+        send "no shutdown\r"
+        expect "#"
+        send "exit\r"
+        expect "#"
+
+        send "interface Ethernet1/1\r"
+        expect "#"
+        send "switchport mode access\r"
+        expect "#"
+        send "switchport access vlan 50\r"
+        expect "#"
+        send "no shutdown\r"
+        expect "#"
+        send "exit\r"
+        expect "#"
+
+        send "end\r"
+        expect "#"
+        send "write memory\r"
+        expect "confirm" { send "\r" }
+        expect "#"
+        send "exit\r"
+        expect eof
+        EOF
+      args:
+        executable: /bin/bash

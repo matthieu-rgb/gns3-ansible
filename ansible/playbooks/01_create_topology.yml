@@ -1,7 +1,7 @@
 ---
 - name: "Subnetting_with_VSLM"
   hosts: localhost
-  connection: "local"
+  connection: local
   gather_facts: no
 
   vars_files:
@@ -26,7 +26,7 @@
         body:
           name: "{{ project_name }}"
         status_code: [200, 201, 409]
-      register: project_result
+      register: project_creation
 
     - name: "Récupérer les projets existants"
       uri:
@@ -34,13 +34,9 @@
         method: GET
       register: projets
 
-    - name: "Afficher les projets"
-      debug:
-        msg: "Projets trouvés : {{ projets.json | map(attribute='name') | list }}"
-
     - name: "Chercher notre projet"
       set_fact:
-        projet_existant: "{{ projets.json | selectattr('name', 'equalto', project_name) | list | first | default(none) }}"
+        projet_existant: "{{ projets.json | selectattr('name', 'equalto', project_name) | first }}"
 
     - name: "Extraire le project_id"
       set_fact:
@@ -78,38 +74,45 @@
           x: -300
           y: 0
         status_code: [200, 201]
-      register: cloud_node
-      ignore_errors: yes
+      register: cloud
 
-    - name: "creer le switch"
+    - name: "Extraire le template_id du switch IOU L2"
+      set_fact:
+        switch_template_id: "{{ (templates.json | selectattr('name', 'equalto', 'Cisco IOU L2') | first).template_id }}"
+
+    - name: "Afficher le template_id du switch"
+      debug:
+        msg: "Template switch ID: {{ switch_template_id }}"
+
+    - name: "Creer le switch IOU L2"
       uri:
-        url: "{{ gns3_url }}/projects/{{ project_id }}/nodes"
+        url: "{{ gns3_url }}/projects/{{ project_id }}/templates/{{ switch_template_id }}"
         method: POST
         body_format: json
         body:
-          name: "switch1"
-          node_type: "ethernet_switch"
-          compute_id: "local"
+          name: "Switch1"
           x: 0
           y: 100
         status_code: [200, 201]
-      register: switch1
-      ignore_errors: yes
+      register: switch
 
-    - name: "creer le routeur"
+    - name: "Extraire le template_id du routeur c2691"
+      set_fact:
+        routeur_template_id: "{{ (templates.json | selectattr('name', 'equalto', 'c2691') | first).template_id }}"
+
+    - name: "Afficher le template_id"
+      debug:
+        msg: "Template routeur ID: {{ routeur_template_id }}"
+
+    - name: "Creer le routeur"
       uri:
-        url: "{{ gns3_url }}/projects/{{ project_id }}/nodes"
+        url: "{{ gns3_url }}/projects/{{ project_id }}/templates/{{ routeur_template_id }}"
         method: POST
         body_format: json
         body:
           name: "Routeur1"
-          node_type: "dynamips"
-          compute_id: "local"
           x: 0
           y: 0
-          properties:
-            platform: "c3725"
-            ram: 256
         status_code: [200, 201]
       register: routeur1
 
@@ -131,7 +134,6 @@
         - { name: "Ventes", y: 0 }
         - { name: "IT", y: 100 }
         - { name: "Invites", y: 200 }
-      ignore_errors: yes
 
     - name: "Recupérer tous les nodes"
       uri:
@@ -139,11 +141,15 @@
         method: GET
       register: all_nodes
 
+    - name: "Afficher tous les nodes"
+      debug:
+        msg: "{{ all_nodes.json | map(attribute='name') | list }}"
+
     - name: "Extraire les node_id"
       set_fact:
         cloud_id: "{{ (all_nodes.json | selectattr('name', 'equalto', 'Internet') | first).node_id }}"
         routeur_id: "{{ (all_nodes.json | selectattr('name', 'equalto', 'Routeur1') | first).node_id }}"
-        switch_id: "{{ (all_nodes.json | selectattr('name', 'equalto', 'switch1') | first).node_id }}"
+        switch_id: "{{ (all_nodes.json | selectattr('name', 'equalto', 'Switch1') | first).node_id }}"
         pc_admin_id: "{{ (all_nodes.json | selectattr('name', 'equalto', 'PC_Admin') | first).node_id }}"
         pc_hr_id: "{{ (all_nodes.json | selectattr('name', 'equalto', 'PC_HR') | first).node_id }}"
         pc_ventes_id: "{{ (all_nodes.json | selectattr('name', 'equalto', 'PC_Ventes') | first).node_id }}"
@@ -154,7 +160,7 @@
       uri:
         url: "{{ gns3_url }}/projects/{{ project_id }}/nodes/{{ routeur_id }}"
         method: GET
-        register: routeur_info
+      register: routeur_info
 
     - name: "Afficher le port console"
       debug:
@@ -167,14 +173,13 @@
         body_format: json
         body:
           nodes:
-            - node_id: "{{ cloud_id }}"
-              adapter_number: 0
+            - adapter_number: 0
+              node_id: "{{ cloud_id }}"
               port_number: 0
-            - node_id: "{{ routeur_id }}"
-              adapter_number: 0
+            - adapter_number: 0
+              node_id: "{{ routeur_id }}"
               port_number: 0
         status_code: [200, 201]
-      ignore_errors: yes
 
     - name: "Lien Routeur <-> Switch"
       uri:
@@ -183,14 +188,13 @@
         body_format: json
         body:
           nodes:
-            - node_id: "{{ routeur_id }}"
-              adapter_number: 0
+            - adapter_number: 0
+              node_id: "{{ routeur_id }}"
               port_number: 1
-            - node_id: "{{ switch_id }}"
-              adapter_number: 0
+            - adapter_number: 0
+              node_id: "{{ switch_id }}"
               port_number: 0
         status_code: [200, 201]
-      ignore_errors: yes
 
     - name: "Lien switch <-> Vpcs"
       uri:
@@ -199,24 +203,22 @@
         body_format: json
         body:
           nodes:
-            - node_id: "{{ switch_id }}"
-              adapter_number: 0
+            - adapter_number: "{{ item.adapter }}"
+              node_id: "{{ switch_id }}"
               port_number: "{{ item.switch_port }}"
-            - node_id: "{{ item.pc_id }}"
-              adapter_number: 0
+            - adapter_number: 0
+              node_id: "{{ item.pc_id }}"
               port_number: 0
         status_code: [200, 201]
-
       loop:
-        - { pc_id: "{{ pc_admin_id }}", switch_port: 1 }
-        - { pc_id: "{{ pc_hr_id }}", switch_port: 2 }
-        - { pc_id: "{{ pc_ventes_id }}", switch_port: 3 }
-        - { pc_id: "{{ pc_it_id }}", switch_port: 4 }
-        - { pc_id: "{{ pc_invites_id }}", switch_port: 5 }
-      ignore_errors: yes
+        - { pc_id: "{{ pc_admin_id }}", adapter: 0, switch_port: 1 }
+        - { pc_id: "{{ pc_hr_id }}", adapter: 0, switch_port: 2 }
+        - { pc_id: "{{ pc_ventes_id }}", adapter: 0, switch_port: 3 }
+        - { pc_id: "{{ pc_it_id }}", adapter: 1, switch_port: 0 }
+        - { pc_id: "{{ pc_invites_id }}", adapter: 1, switch_port: 1 }
 
     - name: "Démarrer tous les nodes"
       uri:
         url: "{{ gns3_url }}/projects/{{ project_id }}/nodes/start"
         method: POST
-        status_code: [200, 204]
+        status_code: [200, 201, 204]

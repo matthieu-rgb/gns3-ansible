@@ -3,143 +3,106 @@
   hosts: localhost
   connection: "local"
   gather_facts: no
-
   vars_files:
     - ../vars/vlsm_network.yml
-
   tasks:
     - name: "Récupérer les projets existants"
       uri:
         url: "{{ gns3_url }}/projects"
         method: GET
       register: projets
-
-    - name: "Afficher les projets"
-      debug:
-        msg: "Projets trouvés : {{ projets.json | map(attribute='name') | list }}"
-
     - name: "Chercher notre projet"
       set_fact:
-        projet_existant: "{{ projets.json | selectattr('name', 'equalto', project_name) | list | first | default(none) }}"
-
+        projet_existant: "{{ projets.json | selectattr('name', 'equalto', project_name) | first }}"
     - name: "Extraire le project_id"
       set_fact:
         project_id: "{{ projet_existant.project_id }}"
-
-    - name: "Afficher le project_id"
-      debug:
-        msg: "Project ID: {{ project_id }}"
-
     - name: "Recupérer tous les nodes"
       uri:
         url: "{{ gns3_url }}/projects/{{ project_id }}/nodes"
         method: GET
       register: all_nodes
-
     - name: "Extraire le routeur_id"
       set_fact:
         routeur_id: "{{ (all_nodes.json | selectattr('name', 'equalto', 'Routeur1') | first).node_id }}"
-
     - name: "Récupérer les infos du routeur"
       uri:
         url: "{{ gns3_url }}/projects/{{ project_id }}/nodes/{{ routeur_id }}"
         method: GET
       register: routeur_info
-
     - name: "Afficher le port console"
       debug:
-        msg: "Console Telnet: localhost:{{ routeur_info.json.console }}"
+        msg: "Console Telnet: 192.168.138.198:{{ routeur_info.json.console }}"
+    - name: "Configurer le routeur complet"
+      ansible.builtin.shell: |
+        expect << 'EOF'
+        set timeout 60
+        spawn telnet 192.168.138.198 {{ routeur_info.json.console }}
 
-    - name: "Configurer l'interface WAN"
-      ansible.netcommon.telnet:
-        host: localhost
-        port: "{{ routeur_info.json.console }}"
-        login_prompt: false
-        prompts:
-          - ">"
-          - "#"
-        command:
-          - "enable"
-          - "configure terminal"
-          - "interface FastEthernet0/0"
-          - "no shutdown"
-          - "ip address dhcp"
-          - "exit"
+        expect "Press RETURN" { send "\r" }
+        expect "#"
 
-    - name: "Configurer route et DNS"
-      ansible.netcommon.telnet:
-        host: localhost
-        port: "{{ routeur_info.json.console }}"
-        login_prompt: false
-        prompts:
-          - "#"
-        command:
-          - "configure terminal"
-          - "ip route 0.0.0.0 0.0.0.0 dhcp"
-          - "ip name-server {{ dns.primary }}"
-          - "ip name-server {{ dns.secondary }}"
-          - "ip domain-lookup"
-          - "exit"
+        send "configure terminal\r"
+        expect "#"
 
-    - name: "Créer les sous-interfaces VLAN"
-      ansible.netcommon.telnet:
-        host: localhost
-        port: "{{ routeur_info.json.console }}"
-        login_prompt: false
-        prompts:
-          - "#"
-        command:
-          - "configure terminal"
-          - "interface FastEthernet0/1.{{ item.id }}"
-          - "encapsulation dot1Q {{ item.id }}"
-          - "ip address {{ item.gateway }} {{ item.mask }}"
-          - "no shutdown"
-          - "exit"
-      loop: "{{ vlans }}"
+        send "interface FastEthernet0/0\r"
+        expect "#"
+        send "no shutdown\r"
+        expect "#"
+        send "ip address dhcp\r"
+        expect "#"
+        send "ip nat outside\r"
+        expect "#"
+        send "exit\r"
+        expect "#"
 
-    - name: "Pool DHCP"
-      ansible.netcommon.telnet:
-        host: localhost
-        port: "{{ routeur_info.json.console }}"
-        login_prompt: false
-        prompts:
-          - "#"
-        command:
-          - "configure terminal"
-          - "ip dhcp excluded-address {{ item.gateway }}"
-          - "ip dhcp pool POOL_{{ item.name }}"
-          - "network {{ item.network }} {{ item.mask }}"
-          - "default-router {{ item.gateway }}"
-          - "dns-server {{ dns.primary }} {{ dns.secondary }}"
-          - "exit"
-      loop: "{{ vlans }}"
+        send "interface FastEthernet0/1\r"
+        expect "#"
+        send "no shutdown\r"
+        expect "#"
+        send "exit\r"
+        expect "#"
 
-    - name: "NAT"
-      ansible.netcommon.telnet:
-        host: localhost
-        port: "{{ routeur_info.json.console }}"
-        login_prompt: false
-        prompts:
-          - "#"
-        command:
-          - "configure terminal"
-          - "interface FastEthernet0/0"
-          - "ip nat outside"
-          - "exit"
-          - "interface FastEthernet0/1"
-          - "ip nat inside"
-          - "exit"
-          - "access-list 1 permit 192.168.100.0 0.0.0.255"
-          - "ip nat inside source list 1 interface FastEthernet0/0 overload"
-          - "exit"
+        {% for vlan in vlans %}
+        send "interface FastEthernet0/1.{{ vlan.id }}\r"
+        expect "#"
+        send "encapsulation dot1Q {{ vlan.id }}\r"
+        expect "#"
+        send "ip address {{ vlan.gateway }} {{ vlan.mask }}\r"
+        expect "#"
+        send "ip nat inside\r"
+        expect "#"
+        send "no shutdown\r"
+        expect "#"
+        send "exit\r"
+        expect "#"
+        {% endfor %}
 
-    - name: "Sauvegarder la configuration"
-      ansible.netcommon.telnet:
-        host: localhost
-        port: "{{ routeur_info.json.console }}"
-        login_prompt: false
-        prompts:
-          - "#"
-        command:
-          - "end"
-          - "write memory"
+        {% for vlan in vlans %}
+        send "ip dhcp excluded-address {{ vlan.gateway }}\r"
+        expect "#"
+        send "ip dhcp pool POOL_{{ vlan.name }}\r"
+        expect "#"
+        send "network {{ vlan.network }} {{ vlan.mask }}\r"
+        expect "#"
+        send "default-router {{ vlan.gateway }}\r"
+        expect "#"
+        send "dns-server {{ dns.primary }} {{ dns.secondary }}\r"
+        expect "#"
+        send "exit\r"
+        expect "#"
+        {% endfor %}
+
+        send "access-list 1 permit 192.168.100.0 0.0.0.255\r"
+        expect "#"
+        send "ip nat inside source list 1 interface FastEthernet0/0 overload\r"
+        expect "#"
+        send "exit\r"
+        expect "#"
+        send "write memory\r"
+        expect "#"
+        send "exit\r"
+        expect eof
+        EOF
+      args:
+        executable: /bin/bash

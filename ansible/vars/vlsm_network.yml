@@ -1,6 +1,8 @@
 ---
 # Configuration GNS3
-gns3_url: "http://127.0.0.1:3080/v2"
+gns3_url: "http://192.168.138.198:80/v2"
+gns3_user: "admin"
+gns3_password: "admin"
 project_name: "lab-vlsm"
 
 # Configuration routeur
