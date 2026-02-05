@@ -1,12 +1,4 @@
 ---
-# ============================================
-# PLAYBOOK : Création de la topologie  pour exoSTP
-# ============================================
-# - 3 switches en triangle (redondance)
-# - 3 PCs (1 par switch)
-# - Liens trunk entre chaque switch
-# ============================================
-
 - name: "Créer la topologie STP (triangle)"
   hosts: localhost
   connection: local
@@ -16,9 +8,6 @@
     - ../vars/network.yml
 
   tasks:
-    # ============================================
-    # ÉTAPE 1 : Connexion et création du projet
-    # ============================================
     - name: "Vérifier la connexion GNS3"
       uri:
         url: "{{ gns3_url }}/version"
@@ -36,7 +25,7 @@
         body_format: json
         body:
           name: "{{ project_name }}"
-        status_code: [200, 201, 409]    # 409 = projet existe déjà
+        status_code: [200, 201, 409]
       register: project_creation
 
     - name: "Récupérer les projets existants"
@@ -63,30 +52,16 @@
         method: POST
         status_code: [200, 201, 204]
 
-    # ============================================
-    # ÉTAPE 2 : Récupérer les templates
-    # ============================================
     - name: "Lister les templates disponibles"
       uri:
         url: "{{ gns3_url }}/templates"
         method: GET
       register: templates
 
-    - name: "Afficher les templates"
-      debug:
-        msg: "{{ templates.json | map(attribute='name') | list }}"
-
     - name: "Extraire le template_id du switch IOU L2"
       set_fact:
         switch_template_id: "{{ (templates.json | selectattr('name', 'equalto', 'Cisco IOU L2') | first).template_id }}"
 
-    - name: "Afficher le template_id du switch"
-      debug:
-        msg: "Template Switch IOU L2: {{ switch_template_id }}"
-
-    # ============================================
-    # ÉTAPE 3 : Créer les 3 switches (triangle)
-    # ============================================
     - name: "Créer les switches"
       uri:
         url: "{{ gns3_url }}/projects/{{ project_id }}/templates/{{ switch_template_id }}"
@@ -99,9 +74,6 @@
         status_code: [200, 201]
       loop: "{{ switches }}"
 
-    # ============================================
-    # ÉTAPE 4 : Créer les 3 PCs
-    # ============================================
     - name: "Créer les PCs"
       uri:
         url: "{{ gns3_url }}/projects/{{ project_id }}/nodes"
@@ -116,9 +88,6 @@
         status_code: [200, 201]
       loop: "{{ pcs }}"
 
-    # ============================================
-    # ÉTAPE 5 : Récupérer tous les nodes créés
-    # ============================================
     - name: "Récupérer tous les nodes"
       uri:
         url: "{{ gns3_url }}/projects/{{ project_id }}/nodes"
@@ -129,12 +98,6 @@
       debug:
         msg: "Nodes créés: {{ all_nodes.json | map(attribute='name') | list }}"
 
-    # ============================================
-    # ÉTAPE 6 : Créer les liens trunk (TRIANGLE)
-    # Switch1 <-> Switch2
-    # Switch1 <-> Switch3
-    # Switch2 <-> Switch3
-    # ============================================
     - name: "Créer les liens trunk (triangle)"
       uri:
         url: "{{ gns3_url }}/projects/{{ project_id }}/links"
@@ -145,4 +108,34 @@
             - node_id: "{{ (all_nodes.json | selectattr('name', 'equalto', item.switch_a) | first).node_id }}"
               adapter_number: "{{ item.adapter_a }}"
               port_number: "{{ item.port_a }}"
-            - node_id: "{{ (all_nodes.json | selectattr('name', 'equalto', item.switch_b) | first)
+            - node_id: "{{ (all_nodes.json | selectattr('name', 'equalto', item.switch_b) | first).node_id }}"
+              adapter_number: "{{ item.adapter_b }}"
+              port_number: "{{ item.port_b }}"
+        status_code: [200, 201]
+      loop: "{{ trunks }}"
+
+    - name: "Créer les liens PC <-> Switch"
+      uri:
+        url: "{{ gns3_url }}/projects/{{ project_id }}/links"
+        method: POST
+        body_format: json
+        body:
+          nodes:
+            - node_id: "{{ (all_nodes.json | selectattr('name', 'equalto', item.switch) | first).node_id }}"
+              adapter_number: "{{ item.adapter }}"
+              port_number: "{{ item.port }}"
+            - node_id: "{{ (all_nodes.json | selectattr('name', 'equalto', item.name) | first).node_id }}"
+              adapter_number: 0
+              port_number: 0
+        status_code: [200, 201]
+      loop: "{{ pcs }}"
+
+    - name: "Démarrer tous les nodes"
+      uri:
+        url: "{{ gns3_url }}/projects/{{ project_id }}/nodes/start"
+        method: POST
+        status_code: [200, 201, 204]
+
+    - name: "Topologie créée avec succès"
+      debug:
+        msg: "✅ Topologie triangle créée ! 3 switches, 3 PCs, liens trunk en triangle."
