@@ -25,7 +25,7 @@
         body_format: json
         body:
           name: "{{ project_name }}"
-        status_code: [200, 201, 409]
+        status_code: [200, 201]
       register: project_creation
 
     - name: "Récupérer les projets existants"
@@ -62,6 +62,20 @@
       debug:
         msg: "{{ templates.json | map(attribute='name') | list }}"
 
+    - name: "Recupérer tous les nodes"
+      uri:
+        url: "{{ gns3_url }}/projects/{{ project_id }}/nodes"
+        method: GET
+      register: all_nodes
+
+    - name: "Extraire les noms des nodes existants"
+      set_fact:
+        existing_node_names: "{{ existing_nodes.json | map(attribute='name') | list }}"
+
+    - name: "Afficher tous les nodes"
+      debug:
+        msg: "{{ all_nodes.json | map(attribute='name') | list }}"
+
     - name: "Creer le Cloud"
       uri:
         url: "{{ gns3_url }}/projects/{{ project_id }}/nodes"
@@ -75,6 +89,7 @@
           y: 0
         status_code: [200, 201]
       register: cloud
+      when: "'Internet' not in existing_node_names"
 
     - name: "Extraire le template_id du switch IOU L2"
       set_fact:
@@ -95,6 +110,7 @@
           y: 100
         status_code: [200, 201]
       register: switch
+      when: '"Switch1" not in existing_node_names'
 
     - name: "Extraire le template_id du routeur c2691"
       set_fact:
@@ -134,16 +150,6 @@
         - { name: "Ventes", y: 0 }
         - { name: "IT", y: 100 }
         - { name: "Invites", y: 200 }
-
-    - name: "Recupérer tous les nodes"
-      uri:
-        url: "{{ gns3_url }}/projects/{{ project_id }}/nodes"
-        method: GET
-      register: all_nodes
-
-    - name: "Afficher tous les nodes"
-      debug:
-        msg: "{{ all_nodes.json | map(attribute='name') | list }}"
 
     - name: "Extraire les node_id"
       set_fact:
