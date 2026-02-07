@@ -1,0 +1,207 @@
+---
+- name: "Configurer EtherChannel LACP"
+  hosts: localhost
+  connection: local
+  gather_facts: no
+
+  vars_files:
+    - ../vars/network.yml
+
+  tasks:
+    # ============================================
+    # RÉCUPÉRATION DES INFOS
+    # ============================================
+    - name: "Récupérer les projets"
+      uri:
+        url: "{{ gns3_url }}/projects"
+        method: GET
+      register: projets
+
+    - name: "Extraire le project_id"
+      set_fact:
+        project_id: "{{ (projets.json | selectattr('name', 'equalto', project_name) | first).project_id }}"
+
+    - name: "Récupérer tous les nodes"
+      uri:
+        url: "{{ gns3_url }}/projects/{{ project_id }}/nodes"
+        method: GET
+      register: all_nodes
+
+    - name: "Extraire les ports console"
+      set_fact:
+        sw1_console: "{{ (all_nodes.json | selectattr('name', 'equalto', 'SW1') | first).console }}"
+        sw2_console: "{{ (all_nodes.json | selectattr('name', 'equalto', 'SW2') | first).console }}"
+
+    - name: "Afficher les ports console"
+      debug:
+        msg:
+          - "SW1: telnet 192.168.138.198 {{ sw1_console }}"
+          - "SW2: telnet 192.168.138.198 {{ sw2_console }}"
+
+    # ============================================
+    # CONFIGURATION SW1
+    # ============================================
+    - name: "Configurer SW1 - EtherChannel LACP"
+      ansible.builtin.shell: |
+        expect << 'EOF'
+        set timeout 60
+        spawn telnet 192.168.138.198 {{ sw1_console }}
+        sleep 3
+        send "\r"
+        sleep 1
+        expect "#"
+
+        send "configure terminal\r"
+        expect "#"
+
+        send "hostname SW1\r"
+        expect "#"
+
+        # Port-channel 1
+        send "interface Port-channel 1\r"
+        expect "#"
+        send "no shutdown\r"
+        expect "#"
+        send "switchport trunk encapsulation dot1q\r"
+        expect "#"
+        send "switchport mode trunk\r"
+        expect "#"
+        send "exit\r"
+        expect "#"
+
+        # Interfaces physiques Eth0/0-3
+        send "interface range Ethernet0/0 - 3\r"
+        expect "#"
+        send "no shutdown\r"
+        expect "#"
+        send "switchport trunk encapsulation dot1q\r"
+        expect "#"
+        send "switchport mode trunk\r"
+        expect "#"
+        send "channel-group 1 mode active\r"
+        expect "#"
+        send "exit\r"
+        expect "#"
+
+        # Interface vers VPC1 (Eth1/0)
+        send "interface Ethernet1/0\r"
+        expect "#"
+        send "switchport mode access\r"
+        expect "#"
+        send "switchport access vlan 1\r"
+        expect "#"
+        send "no shutdown\r"
+        expect "#"
+        send "exit\r"
+        expect "#"
+
+        send "end\r"
+        expect "#"
+        send "write memory\r"
+        sleep 3
+        send "\r"
+        expect "#"
+        send "exit\r"
+        EOF
+      args:
+        executable: /bin/bash
+
+    # ============================================
+    # CONFIGURATION SW2
+    # ============================================
+    - name: "Configurer SW2 - EtherChannel LACP"
+      ansible.builtin.shell: |
+        expect << 'EOF'
+        set timeout 60
+        spawn telnet 192.168.138.198 {{ sw2_console }}
+        sleep 3
+        send "\r"
+        sleep 1
+        expect "#"
+
+        send "configure terminal\r"
+        expect "#"
+
+        send "hostname SW2\r"
+        expect "#"
+
+        # Port-channel 1
+        send "interface Port-channel 1\r"
+        expect "#"
+        send "no shutdown\r"
+        expect "#"
+        send "switchport trunk encapsulation dot1q\r"
+        expect "#"
+        send "switchport mode trunk\r"
+        expect "#"
+        send "exit\r"
+        expect "#"
+
+        # Interfaces physiques Eth0/0-3
+        send "interface range Ethernet0/0 - 3\r"
+        expect "#"
+        send "no shutdown\r"
+        expect "#"
+        send "switchport trunk encapsulation dot1q\r"
+        expect "#"
+        send "switchport mode trunk\r"
+        expect "#"
+        send "channel-group 1 mode active\r"
+        expect "#"
+        send "exit\r"
+        expect "#"
+
+        # Interface vers VPC2 (Eth1/0)
+        send "interface Ethernet1/0\r"
+        expect "#"
+        send "switchport mode access\r"
+        expect "#"
+        send "switchport access vlan 1\r"
+        expect "#"
+        send "no shutdown\r"
+        expect "#"
+        send "exit\r"
+        expect "#"
+
+        send "end\r"
+        expect "#"
+        send "write memory\r"
+        sleep 3
+        send "\r"
+        expect "#"
+        send "exit\r"
+        EOF
+      args:
+        executable: /bin/bash
+
+    # ============================================
+    # RÉSUMÉ
+    # ============================================
+    - name: "Configuration terminée"
+      debug:
+        msg: |
+          ✅ EtherChannel LACP configuré !
+
+          📊 Configuration:
+          - Port-channel 1 (SW1 ↔ SW2)
+          - 4 liens agrégés (Eth0/0-3) en mode LACP active
+          - VPCs sur Eth1/0
+
+          🔜 Tests à effectuer:
+
+          1. Configurer les IPs sur les VPCs:
+             VPC1> ip 192.168.1.1/24
+             VPC2> ip 192.168.1.2/24
+
+          2. Tester la connectivité:
+             VPC1> ping 192.168.1.2
+
+          3. Vérifier l'EtherChannel:
+             SW1# show etherchannel summary
+             SW1# show etherchannel port-channel
+             SW1# show lacp neighbor
+
+          4. Tester la redondance (shutdown un lien):
+             SW1(config)# interface Eth0/0
+             SW1(config-if)# shutdown
+             → Le ping doit continuer !

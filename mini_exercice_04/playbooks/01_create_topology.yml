@@ -1,0 +1,224 @@
+---
+- name: "Créer la topologie EtherChannel LACP (idempotent)"
+  hosts: localhost
+  connection: local
+  gather_facts: no
+
+  vars_files:
+    - ../vars/network.yml
+
+  tasks:
+    # ============================================
+    # CONNEXION ET PROJET
+    # ============================================
+    - name: "Vérifier la connexion GNS3"
+      uri:
+        url: "{{ gns3_url }}/version"
+        method: GET
+      register: gns3_version
+
+    - name: "Afficher la version GNS3"
+      debug:
+        msg: "GNS3 version: {{ gns3_version.json.version }}"
+
+    - name: "Récupérer les projets existants"
+      uri:
+        url: "{{ gns3_url }}/projects"
+        method: GET
+      register: projets
+
+    - name: "Extraire les noms des projets existants"
+      set_fact:
+        existing_project_names: "{{ projets.json | map(attribute='name') | list }}"
+
+    - name: "Créer le projet GNS3"
+      uri:
+        url: "{{ gns3_url }}/projects"
+        method: POST
+        body_format: json
+        body:
+          name: "{{ project_name }}"
+        status_code: [200, 201]
+      when: project_name not in existing_project_names
+      register: new_project
+
+    - name: "Récupérer les projets (mise à jour)"
+      uri:
+        url: "{{ gns3_url }}/projects"
+        method: GET
+      register: projets
+
+    - name: "Extraire le project_id"
+      set_fact:
+        project_id: "{{ (projets.json | selectattr('name', 'equalto', project_name) | first).project_id }}"
+
+    - name: "Afficher le project_id"
+      debug:
+        msg: "Project ID: {{ project_id }}"
+
+    - name: "Ouvrir le projet"
+      uri:
+        url: "{{ gns3_url }}/projects/{{ project_id }}/open"
+        method: POST
+        status_code: [200, 201, 204]
+
+    # ============================================
+    # TEMPLATES
+    # ============================================
+    - name: "Lister les templates"
+      uri:
+        url: "{{ gns3_url }}/templates"
+        method: GET
+      register: templates
+
+    - name: "Extraire le template_id du switch IOU L2"
+      set_fact:
+        switch_template_id: "{{ (templates.json | selectattr('name', 'equalto', 'Cisco IOU L2') | first).template_id }}"
+
+    # ============================================
+    # NODES EXISTANTS
+    # ============================================
+    - name: "Récupérer les nodes existants"
+      uri:
+        url: "{{ gns3_url }}/projects/{{ project_id }}/nodes"
+        method: GET
+      register: existing_nodes
+
+    - name: "Extraire les noms des nodes existants"
+      set_fact:
+        existing_node_names: "{{ existing_nodes.json | map(attribute='name') | list }}"
+
+    - name: "Afficher les nodes existants"
+      debug:
+        msg: "Nodes existants: {{ existing_node_names }}"
+
+    # ============================================
+    # CRÉATION DES SWITCHES (si n'existent pas)
+    # ============================================
+    - name: "Créer les switches (si n'existent pas)"
+      uri:
+        url: "{{ gns3_url }}/projects/{{ project_id }}/templates/{{ switch_template_id }}"
+        method: POST
+        body_format: json
+        body:
+          name: "{{ item.name }}"
+          x: "{{ item.x }}"
+          y: "{{ item.y }}"
+        status_code: [200, 201]
+      loop: "{{ switches }}"
+      when: item.name not in existing_node_names
+
+    # ============================================
+    # CRÉATION DES VPCs (si n'existent pas)
+    # ============================================
+    - name: "Créer les VPCs (si n'existent pas)"
+      uri:
+        url: "{{ gns3_url }}/projects/{{ project_id }}/nodes"
+        method: POST
+        body_format: json
+        body:
+          name: "{{ item.name }}"
+          node_type: "vpcs"
+          compute_id: "local"
+          x: "{{ item.x }}"
+          y: "{{ item.y }}"
+        status_code: [200, 201]
+      loop: "{{ pcs }}"
+      when: item.name not in existing_node_names
+
+    # ============================================
+    # RÉCUPÉRER TOUS LES NODES (après création)
+    # ============================================
+    - name: "Récupérer tous les nodes (mise à jour)"
+      uri:
+        url: "{{ gns3_url }}/projects/{{ project_id }}/nodes"
+        method: GET
+      register: all_nodes
+
+    - name: "Afficher les nodes"
+      debug:
+        msg: "Nodes: {{ all_nodes.json | map(attribute='name') | list }}"
+
+    # ============================================
+    # LIENS EXISTANTS
+    # ============================================
+    - name: "Récupérer les liens existants"
+      uri:
+        url: "{{ gns3_url }}/projects/{{ project_id }}/links"
+        method: GET
+      register: existing_links
+
+    - name: "Compter les liens existants"
+      set_fact:
+        existing_links_count: "{{ existing_links.json | length }}"
+
+    - name: "Afficher le nombre de liens"
+      debug:
+        msg: "Liens existants: {{ existing_links_count }}"
+
+    # ============================================
+    # CRÉATION DES LIENS ETHERCHANNEL (si pas assez de liens)
+    # ============================================
+    - name: "Créer les 4 liens EtherChannel"
+      uri:
+        url: "{{ gns3_url }}/projects/{{ project_id }}/links"
+        method: POST
+        body_format: json
+        body:
+          nodes:
+            - node_id: "{{ (all_nodes.json | selectattr('name', 'equalto', item.switch_a) | first).node_id }}"
+              adapter_number: "{{ item.adapter_a }}"
+              port_number: "{{ item.port_a }}"
+            - node_id: "{{ (all_nodes.json | selectattr('name', 'equalto', item.switch_b) | first).node_id }}"
+              adapter_number: "{{ item.adapter_b }}"
+              port_number: "{{ item.port_b }}"
+        status_code: [200, 201]
+      loop: "{{ etherchannel_links }}"
+      when: existing_links_count | int < 6
+      ignore_errors: yes
+
+    # ============================================
+    # CRÉATION DES LIENS VPC (si pas assez de liens)
+    # ============================================
+    - name: "Créer les liens VPC <-> Switch"
+      uri:
+        url: "{{ gns3_url }}/projects/{{ project_id }}/links"
+        method: POST
+        body_format: json
+        body:
+          nodes:
+            - node_id: "{{ (all_nodes.json | selectattr('name', 'equalto', item.switch) | first).node_id }}"
+              adapter_number: "{{ item.adapter }}"
+              port_number: "{{ item.port }}"
+            - node_id: "{{ (all_nodes.json | selectattr('name', 'equalto', item.name) | first).node_id }}"
+              adapter_number: 0
+              port_number: 0
+        status_code: [200, 201]
+      loop: "{{ pcs }}"
+      when: existing_links_count | int < 6
+      ignore_errors: yes
+
+    # ============================================
+    # DÉMARRAGE
+    # ============================================
+    - name: "Démarrer tous les nodes"
+      uri:
+        url: "{{ gns3_url }}/projects/{{ project_id }}/nodes/start"
+        method: POST
+        status_code: [200, 201, 204]
+
+    # ============================================
+    # RÉSUMÉ
+    # ============================================
+    - name: "Topologie prête"
+      debug:
+        msg: |
+          ✅ Topologie EtherChannel vérifiée/créée !
+
+          📊 État:
+          - Projet: {{ project_name }}
+          - Nodes: {{ all_nodes.json | map(attribute='name') | list }}
+          - Liens: {{ existing_links_count }} existants
+
+          🔜 Prochaine étape:
+          ansible-playbook playbooks/02_configure_switches.yml

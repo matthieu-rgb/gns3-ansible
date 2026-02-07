@@ -1,0 +1,78 @@
+---
+# ============================================
+# TOPOLOGIE ETHERCHANNEL LACP
+# ============================================
+#
+#     SW1 ════════════════════ SW2
+#         Eth0/0 ─────── Eth0/0
+#         Eth0/1 ─────── Eth0/1
+#         Eth0/2 ─────── Eth0/2
+#         Eth0/3 ─────── Eth0/3
+#              (Port-channel 1)
+#
+#      │                        │
+#   Eth1/0                   Eth1/0
+#      │                        │
+#    VPC1                     VPC2
+# 192.168.1.1             192.168.1.2
+#
+# ============================================
+
+# === Configuration GNS3 ===
+gns3_url: "http://192.168.138.198:80/v2"
+project_name: "lab-etherchannel"
+
+# === Switches ===
+switches:
+  - name: "SW1"
+    x: -200
+    y: 0
+  - name: "SW2"
+    x: 200
+    y: 0
+
+# === VPCs ===
+pcs:
+  - name: "VPC1"
+    switch: "SW1"
+    adapter: 1 # Adapter 1 = Ethernet1/x
+    port: 0 # Port 0 = Ethernet1/0
+    ip: "192.168.1.1"
+    mask: "24"
+    x: -200
+    y: 150
+  - name: "VPC2"
+    switch: "SW2"
+    adapter: 1
+    port: 0
+    ip: "192.168.1.2"
+    mask: "24"
+    x: 200
+    y: 150
+
+# === Liens EtherChannel (4 liens entre SW1 et SW2) ===
+etherchannel_links:
+  - switch_a: "SW1"
+    adapter_a: 0
+    port_a: 0 # Eth0/0
+    switch_b: "SW2"
+    adapter_b: 0
+    port_b: 0 # Eth0/0
+  - switch_a: "SW1"
+    adapter_a: 0
+    port_a: 1 # Eth0/1
+    switch_b: "SW2"
+    adapter_b: 0
+    port_b: 1 # Eth0/1
+  - switch_a: "SW1"
+    adapter_a: 0
+    port_a: 2 # Eth0/2
+    switch_b: "SW2"
+    adapter_b: 0
+    port_b: 2 # Eth0/2
+  - switch_a: "SW1"
+    adapter_a: 0
+    port_a: 3 # Eth0/3
+    switch_b: "SW2"
+    adapter_b: 0
+    port_b: 3 # Eth0/3
