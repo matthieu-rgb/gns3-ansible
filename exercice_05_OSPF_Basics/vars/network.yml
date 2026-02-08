@@ -1,0 +1,66 @@
+# === Configuration GNS3 ===
+gns3_url: "http://192.168.138.198:80/v2"
+project_name: "lab-OSPF-Basics"
+#========================================
+#     Creation Routeur avec ip pour ospf
+# =======================================
+
+router:
+  - name: "R1"
+    x: 0
+    y: 0
+    interfaces:
+      - name: "FastEthernet0/0"
+        ip: "192.168.12.1"
+        mask: "255.255.255.0"
+      - name: "FastEthernet0/1"
+        ip: "192.168.31.1"
+        mask: "255.255.255.0"
+
+  - name: "R2"
+    x: 200
+    y: 0
+    interfaces:
+      - name: "FastEthernet0/0"
+        ip: "192.168.12.2"
+        mask: "255.255.255.0"
+      - name: "FastEthernet0/1"
+        ip: "192.168.23.1"
+        mask: "255.255.255.0"
+
+  - name: "R3"
+    x: 100
+    y: 150
+    interfaces:
+      - name: "FastEthernet0/0"
+        ip: "192.168.23.2"
+        mask: "255.255.255.0"
+      - name: "FastEthernet0/1"
+        ip: "192.168.31.2"
+        mask: "255.255.255.0"
+
+#=====================================
+#    Creation des liens
+# ====================================
+
+links:
+  - router_a: "R1"
+    adapter_a: 0
+    port_a: 0
+    router_b: "R2"
+    adapter_b: 0
+    port_b: 0
+
+  - router_a: "R2"
+    adapter_a: 0
+    port_a: 1
+    router_b: "R3"
+    adapter_b: 0
+    port_b: 0
+
+  - router_a: "R3"
+    adapter_a: 0
+    port_a: 1
+    router_b: "R1"
+    adapter_b: 0
+    port_b: 1
