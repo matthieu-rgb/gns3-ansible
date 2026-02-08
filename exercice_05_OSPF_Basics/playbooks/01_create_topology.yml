@@ -71,9 +71,9 @@
         method: GET
       register: templates
 
-    - name: "Extraire le template_id du routeur Cisco c2691"
+    - name: "Extraire le template_id du routeur c2691"
       set_fact:
-        router_template_id: "{{ (templates.json | selectattr('name', 'equalto', 'Cisco c2691') | first).template_id }}"
+        router_template_id: "{{ (templates.json | selectattr('name', 'equalto', 'c2691') | first).template_id }}"
 
     # ============================================
     # NODES EXISTANTS
