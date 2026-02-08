@@ -213,12 +213,12 @@
     - name: "Topologie prête"
       debug:
         msg: |
-          ✅ Topologie EtherChannel vérifiée/créée !
+          Topologie EtherChannel vérifiée/créée !
 
-          📊 État:
+           État:
           - Projet: {{ project_name }}
           - Nodes: {{ all_nodes.json | map(attribute='name') | list }}
           - Liens: {{ existing_links_count }} existants
 
-          🔜 Prochaine étape:
+            Prochaine étape:
           ansible-playbook playbooks/02_configure_switches.yml

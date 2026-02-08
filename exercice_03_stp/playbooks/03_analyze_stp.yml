@@ -127,30 +127,30 @@
       debug:
         msg: |
           ============================================
-          📚 GUIDE D'INTERPRÉTATION STP
+            GUIDE D'INTERPRÉTATION STP
           ============================================
 
-          🔍 Dans les résultats, cherchez :
+            Dans les résultats, cherchez :
 
-          1️⃣  ROOT BRIDGE (Pont Racine)
+          1 ROOT BRIDGE (Pont Racine)
              → "This bridge is the root"
              → Le switch avec la PLUS BASSE priorité
              → Priorité par défaut : 32768 + VLAN ID
 
-          2️⃣  RÔLES DES PORTS
+          2 RÔLES DES PORTS
              → Root (Root)     : Meilleur chemin vers le Root Bridge
              → Desg (Designated) : Port qui forward le trafic
              → BLK  (Blocked)  : Port bloqué pour éviter la boucle
              → Altn (Alternate) : Port de backup (bloqué)
 
-          3️⃣  ÉTATS DES PORTS
+          3 ÉTATS DES PORTS
              → FWD (Forwarding) : Actif, transmet le trafic
              → BLK (Blocking)   : Bloqué, ne transmet pas
              → LRN (Learning)   : Apprend les MAC, ne transmet pas encore
              → LIS (Listening)  : Écoute les BPDU
 
           ============================================
-          🔧 COMMANDES MANUELLES UTILES
+            COMMANDES MANUELLES UTILES
           ============================================
 
           telnet 192.168.138.198 {{ switch1_console }}

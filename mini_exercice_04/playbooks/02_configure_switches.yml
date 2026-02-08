@@ -57,14 +57,16 @@
         send "hostname SW1\r"
         expect "#"
 
-        # Port-channel 1
-        send "interface Port-channel 1\r"
+        # Port-channel 1 - IMPORTANT: switchport d'abord !
+        send "interface Port-channel1\r"
         expect "#"
-        send "no shutdown\r"
+        send "switchport\r"
         expect "#"
         send "switchport trunk encapsulation dot1q\r"
         expect "#"
         send "switchport mode trunk\r"
+        expect "#"
+        send "no shutdown\r"
         expect "#"
         send "exit\r"
         expect "#"
@@ -72,7 +74,7 @@
         # Interfaces physiques Eth0/0-3
         send "interface range Ethernet0/0 - 3\r"
         expect "#"
-        send "no shutdown\r"
+        send "switchport\r"
         expect "#"
         send "switchport trunk encapsulation dot1q\r"
         expect "#"
@@ -80,11 +82,15 @@
         expect "#"
         send "channel-group 1 mode active\r"
         expect "#"
+        send "no shutdown\r"
+        expect "#"
         send "exit\r"
         expect "#"
 
         # Interface vers VPC1 (Eth1/0)
         send "interface Ethernet1/0\r"
+        expect "#"
+        send "switchport\r"
         expect "#"
         send "switchport mode access\r"
         expect "#"
@@ -125,14 +131,16 @@
         send "hostname SW2\r"
         expect "#"
 
-        # Port-channel 1
-        send "interface Port-channel 1\r"
+        # Port-channel 1 - IMPORTANT: switchport d'abord !
+        send "interface Port-channel1\r"
         expect "#"
-        send "no shutdown\r"
+        send "switchport\r"
         expect "#"
         send "switchport trunk encapsulation dot1q\r"
         expect "#"
         send "switchport mode trunk\r"
+        expect "#"
+        send "no shutdown\r"
         expect "#"
         send "exit\r"
         expect "#"
@@ -140,7 +148,7 @@
         # Interfaces physiques Eth0/0-3
         send "interface range Ethernet0/0 - 3\r"
         expect "#"
-        send "no shutdown\r"
+        send "switchport\r"
         expect "#"
         send "switchport trunk encapsulation dot1q\r"
         expect "#"
@@ -148,11 +156,15 @@
         expect "#"
         send "channel-group 1 mode active\r"
         expect "#"
+        send "no shutdown\r"
+        expect "#"
         send "exit\r"
         expect "#"
 
         # Interface vers VPC2 (Eth1/0)
         send "interface Ethernet1/0\r"
+        expect "#"
+        send "switchport\r"
         expect "#"
         send "switchport mode access\r"
         expect "#"
@@ -180,28 +192,26 @@
     - name: "Configuration terminée"
       debug:
         msg: |
-          ✅ EtherChannel LACP configuré !
+          EtherChannel LACP configuré !
 
-          📊 Configuration:
-          - Port-channel 1 (SW1 ↔ SW2)
-          - 4 liens agrégés (Eth0/0-3) en mode LACP active
-          - VPCs sur Eth1/0
+          Configuration:
+           - Port-channel 1 (SW1 ↔ SW2)
+           - 4 liens agrégés (Eth0/0-3) en mode LACP active
+           - VPCs sur Eth1/0
 
-          🔜 Tests à effectuer:
+            Tests à effectuer:
 
-          1. Configurer les IPs sur les VPCs:
-             VPC1> ip 192.168.1.1/24
-             VPC2> ip 192.168.1.2/24
+           1. Configurer les IPs sur les VPCs:
+              VPC1> ip 192.168.1.1/24
+              VPC2> ip 192.168.1.2/24
 
-          2. Tester la connectivité:
-             VPC1> ping 192.168.1.2
+           2. Tester la connectivité:
+              VPC1> ping 192.168.1.2
 
-          3. Vérifier l'EtherChannel:
-             SW1# show etherchannel summary
-             SW1# show etherchannel port-channel
-             SW1# show lacp neighbor
+           3. Vérifier l'EtherChannel:
+              SW1# show etherchannel summary
 
-          4. Tester la redondance (shutdown un lien):
-             SW1(config)# interface Eth0/0
-             SW1(config-if)# shutdown
-             → Le ping doit continuer !
+           4. Tester la redondance:
+              SW1(config)# interface Eth0/0
+              SW1(config-if)# shutdown
+              → Le ping doit continuer !

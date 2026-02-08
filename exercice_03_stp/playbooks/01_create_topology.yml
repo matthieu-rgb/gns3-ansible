@@ -138,4 +138,4 @@
 
     - name: "Topologie créée avec succès"
       debug:
-        msg: "✅ Topologie triangle créée ! 3 switches, 3 PCs, liens trunk en triangle."
+        msg: "  Topologie triangle créée ! 3 switches, 3 PCs, liens trunk en triangle."
