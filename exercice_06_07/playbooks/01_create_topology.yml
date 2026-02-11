@@ -116,6 +116,7 @@
           name: "{{ item.name }}"
           x: "{{ item.x }}"
           y: "{{ item.y }}"
+          compute_id: "local"
         status_code: [200, 201]
       loop: "{{ switches }}"
       when: item.name not in existing_node_names
@@ -131,6 +132,7 @@
           name: "{{ item.name }}"
           x: "{{ item.x }}"
           y: "{{ item.y }}"
+          compute_id: "local"
         status_code: [200, 201]
       loop: "{{ Pfsense }}"
       when: item.name not in existing_node_names
@@ -146,6 +148,7 @@
           name: "{{ item.name }}"
           x: "{{ item.x }}"
           y: "{{ item.y }}"
+          compute_id: "local"
         status_code: [200, 201]
       loop: "{{ webterm }}"
       when: item.name not in existing_node_names
@@ -161,6 +164,7 @@
           name: "{{ item.name }}"
           x: "{{ item.x }}"
           y: "{{ item.y }}"
+          compute_id: "local"
         status_code: [200, 201]
       loop: "{{ NAT }}"
       when: item.name not in existing_node_names
