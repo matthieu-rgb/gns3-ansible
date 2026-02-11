@@ -1,0 +1,101 @@
+gns3_url: "http://192.168.138.198:80/v2"
+project_name: "lab-pfsense-wireguard"
+
+#             ┌─────────┐
+#             │  NAT1   │  ← Simule Internet
+#             │ (Cloud) │
+#             └────┬────┘
+#                  │
+#             ┌────┴────┐
+#             │ Switch1 │  ← "Internet" partagé
+#             └──┬───┬──┘
+#                │   │
+#     WAN (DHCP) │   │ WAN (DHCP)
+#                │   │
+#         ┌──────┴┐ ┌┴──────┐
+#         │pfSense│ │pfSense│
+#         │   A   │ │   B   │
+#         └──┬────┘ └────┬──┘
+#     LAN    │           │    LAN
+#  192.168.1.1      192.168.2.1
+#            │           │
+#       ┌────┴───┐ ┌────┴───┐
+#       │webterm │ │webterm │
+#       │   A    │ │   B    │
+#       └────────┘ └────────┘
+#    192.168.1.x    192.168.2.x
+
+# ═══════════════════════════════
+# Tunnel WireGuard (site-to-site)
+# pfSense-A  ◄──── chiffré ────►  pfSense-B
+# 10.6.210.1                      10.6.210.2
+#
+
+# Switches
+switches:
+  - name: "ethernet_switch"
+    x: 0
+    y: -300
+
+# NAT
+NAT:
+  - name: "NAT"
+    x: 0
+    y: -400
+
+# webterm
+webterm:
+  - name: "webterm-A"
+    x: 300
+    y: -100
+
+  - name: "webterm-B"
+    x: 300
+    y: 100
+
+#Pfsense
+Pfsense:
+  - name: "Pfsense-A"
+    x: 400
+    y: -200
+  - name: "Pfsense-B"
+    x: 400
+    y: 200
+
+#liens entre les machines
+#
+links:
+  - node_a: "NAT"
+    adapter_a: 0
+    port_a: 0
+    node_b: "ethernet_switch"
+    adapter_b: 0
+    port_b: 0
+
+  - node_a: "ethernet_switch"
+    adapter_a: 0
+    port_a: 1
+    node_b: "Pfsense-A"
+    adapter_b: 0
+    port_b: 0
+
+  - node_a: "ethernet_switch"
+    adapter_a: 0
+    port_a: 2
+    node_b: "Pfsense-B"
+    adapter_b: 0
+    port_b: 0
+
+  - node_a: "Pfsense-A"
+    adapter_a: 1
+    port_a: 0
+    node_b: "webterm-A"
+    adapter_b: 0
+    port_b: 0
+
+  - node_a: "Pfsense-B"
+    adapter_a: 1
+    port_a: 0
+    node_b: "webterm-B"
+    adapter_b: 0
+    port_b: 0

@@ -1,0 +1,213 @@
+---
+- name: "Pf sense and Wireguard"
+  hosts: localhost
+  connection: local
+  gather_facts: no
+
+  vars_files:
+    - ../vars/network.yml
+
+  tasks:
+    # ============================================
+    # CONNEXION ET PROJET
+    # ============================================
+    - name: "Vérifier la connexion GNS3"
+      uri:
+        url: "{{ gns3_url }}/version"
+        method: GET
+      register: gns3_version
+
+    - name: "Afficher la version GNS3"
+      debug:
+        msg: "GNS3 version: {{ gns3_version.json.version }}"
+
+    - name: "Récupérer les projets existants"
+      uri:
+        url: "{{ gns3_url }}/projects"
+        method: GET
+      register: projets
+
+    - name: "Extraire les noms des projets existants"
+      set_fact:
+        existing_project_names: "{{ projets.json | map(attribute='name') | list }}"
+
+    - name: "Créer le projet GNS3"
+      uri:
+        url: "{{ gns3_url }}/projects"
+        method: POST
+        body_format: json
+        body:
+          name: "{{ project_name }}"
+        status_code: [200, 201]
+      when: project_name not in existing_project_names
+      register: new_project
+
+    - name: "Récupérer les projets (mise à jour)"
+      uri:
+        url: "{{ gns3_url }}/projects"
+        method: GET
+      register: projets
+
+    - name: "Extraire le project_id"
+      set_fact:
+        project_id: "{{ (projets.json | selectattr('name', 'equalto', project_name) | first).project_id }}"
+
+    - name: "Afficher le project_id"
+      debug:
+        msg: "Project ID: {{ project_id }}"
+
+    - name: "Ouvrir le projet"
+      uri:
+        url: "{{ gns3_url }}/projects/{{ project_id }}/open"
+        method: POST
+        status_code: [200, 201, 204]
+
+    # ============================================
+    # TEMPLATES
+    # ============================================
+    - name: "Lister les templates"
+      uri:
+        url: "{{ gns3_url }}/templates"
+        method: GET
+      register: templates
+
+    - name: "Extraire le template_id du Ethernet switch"
+      set_fact:
+        ethernet_switch_template_id: "{{ (templates.json | selectattr('name', 'equalto', 'Ethernet switch') | first).template_id }}"
+
+    - name: "Extraire le template_id de Pfsense"
+      set_fact:
+        Pfsense_template_id: "{{ (templates.json | selectattr('name', 'equalto', 'Pfsense') | first).template_id }}"
+
+    - name: "Extraire le template_id de webterm"
+      set_fact:
+        webterm_template_id: "{{ (templates.json | selectattr('name', 'equalto', 'webterm') | first).template_id }}"
+
+    - name: "Extraire le template_id de NAT"
+      set_fact:
+        NAT_template_id: "{{ (templates.json | selectattr('name', 'equalto', 'NAT') | first).template_id }}"
+
+    # ============================================
+    # NODES EXISTANTS
+    # ============================================
+    - name: "Récupérer les nodes existants"
+      uri:
+        url: "{{ gns3_url }}/projects/{{ project_id }}/nodes"
+        method: GET
+      register: existing_nodes
+
+    - name: "Extraire les noms des nodes existants"
+      set_fact:
+        existing_node_names: "{{ existing_nodes.json | map(attribute='name') | list }}"
+
+    - name: "Afficher les nodes existants"
+      debug:
+        msg: "Nodes existants: {{ existing_node_names }}"
+
+      # ============================================
+    # ÉTAPE 1 : Créer le switches
+    # ============================================
+    - name: "Créer le switches"
+      uri:
+        url: "{{ gns3_url }}/projects/{{ project_id }}/templates/{{ ethernet_switch_template_id }}"
+        method: POST
+        body_format: json
+        body:
+          name: "{{ item.name }}"
+          x: "{{ item.x }}"
+          y: "{{ item.y }}"
+        status_code: [200, 201]
+      loop: "{{ switches }}"
+      when: item.name not in existing_node_names
+    # ============================================
+    # ÉTAPE 2 : Créer pfsense
+    # ============================================
+    - name: "Créer Pfsense"
+      uri:
+        url: "{{ gns3_url }}/projects/{{ project_id }}/templates/{{ Pfsense_template_id }}"
+        method: POST
+        body_format: json
+        body:
+          name: "{{ item.name }}"
+          x: "{{ item.x }}"
+          y: "{{ item.y }}"
+        status_code: [200, 201]
+      loop: "{{ Pfsense }}"
+      when: item.name not in existing_node_names
+    # ============================================
+    # ÉTAPE 3 : Créer les webterm
+    # ============================================
+    - name: "Créer les webterm"
+      uri:
+        url: "{{ gns3_url }}/projects/{{ project_id }}/templates/{{ webterm_template_id }}"
+        method: POST
+        body_format: json
+        body:
+          name: "{{ item.name }}"
+          x: "{{ item.x }}"
+          y: "{{ item.y }}"
+        status_code: [200, 201]
+      loop: "{{ webterm }}"
+      when: item.name not in existing_node_names
+      # ============================================
+    # ÉTAPE 4 : Créer le NAT
+    # ============================================
+    - name: "Créer le NAT"
+      uri:
+        url: "{{ gns3_url }}/projects/{{ project_id }}/templates/{{ NAT_template_id }}"
+        method: POST
+        body_format: json
+        body:
+          name: "{{ item.name }}"
+          x: "{{ item.x }}"
+          y: "{{ item.y }}"
+        status_code: [200, 201]
+      loop: "{{ NAT }}"
+      when: item.name not in existing_node_names
+
+    # ============================================
+    # ÉTAPE 5 : Récupérer tous les nodes créés
+    # ============================================
+    - name: "Récupérer tous les nodes"
+      uri:
+        url: "{{ gns3_url }}/projects/{{ project_id }}/nodes"
+        method: GET
+      register: all_nodes
+
+    - name: "Afficher tous les nodes"
+      debug:
+        msg: "{{ all_nodes.json | map(attribute='name') | list }}"
+
+    #=========================
+    #   Creer les liens avec loop
+    # =============================
+    #
+    - name: "Créer les liens"
+      uri:
+        url: "{{ gns3_url }}/projects/{{ project_id }}/links"
+        method: POST
+        body_format: json
+        body:
+          nodes:
+            - node_id: "{{ (all_nodes.json | selectattr('name', 'equalto', item.node_a) | first).node_id }}"
+              adapter_number: "{{ item.adapter_a }}"
+              port_number: "{{ item.port_a }}"
+            - node_id: "{{ (all_nodes.json | selectattr('name', 'equalto', item.node_b) | first).node_id }}"
+              adapter_number: "{{ item.adapter_b }}"
+              port_number: "{{ item.port_b }}"
+        status_code: [200, 201]
+      loop:
+        "{{ links }}"
+
+        # ============================================
+    # ÉTAPE 8 : Démarrer tous les nodes
+    # ============================================
+    - name: "Démarrer tous les nodes"
+      uri:
+        url: "{{ gns3_url }}/projects/{{ project_id }}/nodes/start"
+        method: POST
+        status_code: [200, 201, 204]
+
+    - name: "Topologie créée avec succès"
+      debug:
+        msg: " Topologie créée ! 1 switches, 1 NAT, 2 Pfsense, 2 webterm et les liens ."
